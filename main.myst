@@ -1,0 +1,61 @@
+rune Being{
+    spell __init__(self){
+        pass
+    }
+
+    spell speak():str{
+        chant "..."
+    }
+}
+
+
+rune Person(Being){
+    bind character: int
+    bind ego: int
+    spell __init__(self){
+        pass
+    }
+    spell argue(){
+        // implicit return null 
+        bind s:str="#@..."
+    }
+}
+
+
+
+rune Ticket{
+    bind price:int
+    bind quantity:int
+    spell __init__(self,price:int,quantity:int){
+        self.price= price
+        self.quantity= quantity
+    }
+    spell buy(self){
+        self.
+    }
+}
+
+spell getTicket(price:int, quantity:int):Ticket{
+
+    seal space:int=5
+
+
+    reveal space>10 {
+    } veil {
+    }
+
+
+    invoke i in 0..5{
+        print(i)
+    }
+    chant Ticket(price=price,quantity=quantity)
+}
+
+
+p=Person()
+p.argue()
+p.speak()
+
+
+bind output:Ticket = getTicket(price=6,quantity=10)
+
