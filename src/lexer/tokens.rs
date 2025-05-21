@@ -1,3 +1,5 @@
+use super::position::Postion;
+
 #[derive(Debug,PartialEq,Clone)]
 pub enum Literal{
     // Int variant of Literal contains i64 type
@@ -83,3 +85,9 @@ pub enum TokenType{
     Eof            // end of file
 }
 
+
+#[derive(Debug,PartialEq,Clone)]
+pub struct Token{
+    pub token_type: TokenType,
+    pub postion: Postion
+}
