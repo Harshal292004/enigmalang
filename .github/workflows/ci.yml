@@ -21,16 +21,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4 # checks out your repository code so the workflow can access it
     - name: Install Rust 
-      uses: actions-rs/toolchain@v1
+      uses: actions-rs/toolchain@v1 # installs the Rust toolchain, making sure stable Rust is available
       with: 
         toolchain: stable
         override: true
     - name: Check formatting 
-      run: cargo fmt -- --check
+      run: cargo fmt -- --check # checks if code is formatted properly without changing files
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose # compiles the Rust project with detailed output
     - name: Run tests 
-      run: cargo test --verbose
-    
+      run: cargo test --verbose # runs the test suite with detailed output

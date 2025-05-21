@@ -48,6 +48,12 @@ It's type safe and supports automatic memory management using a garbage collecto
 13. `draws` (**Inheritance**)  
     Used to inherit classes.
 
+14. `shatter` (**break**) 
+    Used to break a loop
+    
+15. `phase` (**continue**)
+    Used to continue 
+
 ## Language Specification
 
 ### Comments 
@@ -119,7 +125,7 @@ reveal condition {
 `invoke` (**for loop**)
 
 ```
-invoke i in start..end {
+invoke i in start..end , 2 {
     # Code block
 }
 ```
