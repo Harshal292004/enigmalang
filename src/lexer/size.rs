@@ -1,5 +1,5 @@
 #[derive(Clone ,Debug, PartialEq)]
-pub struct  Postion{
+pub struct Size{
    pub  start: usize,
    pub  end: usize 
 }

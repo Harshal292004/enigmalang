@@ -1,4 +1,4 @@
-use super::position::Postion;
+use super::size::Size;
 
 #[derive(Debug,PartialEq,Clone)]
 pub enum Literal{
@@ -89,5 +89,5 @@ pub enum TokenType{
 #[derive(Debug,PartialEq,Clone)]
 pub struct Token{
     pub token_type: TokenType,
-    pub postion: Postion
+    pub size:Size
 }
