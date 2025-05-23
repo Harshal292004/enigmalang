@@ -41,7 +41,68 @@ impl <'l> Lexer<'l> {
                 break;
             }
         }        
+    }   
+    pub fn skip_single_line_comment(&mut self){
+         // single line comment
+         while let Some((_,ch)) = self.peek_char(){
+            if ch=='\n'{
+             //TODO:  I need to check this kinda correct
+             self.next_char();
+             break;
+            }
+            self.next_char();
+         }
     }
+    pub fn skip_comments(&mut self){
+         //  consume first #
+         self.next_char();
+
+         if let Some((_,'#'))= self.peek_char(){
+            // consume second #
+            self.next_char();
+
+
+            if let Some((_,'#'))= self.peek_char(){
+                // consume third #
+                self.next_char(); 
+                loop{
+                    match self.peek_char() {
+                        Some((_,'#'))=>{
+                            // consume the first # 
+                            self.next_char();
+                            if let Some((_,'#'))=self.peek_char(){
+                                // consume second # in ending
+                                self.next_char();
+                                
+                                if let Some((_,'#'))= self.peek_char(){
+                                    // consume third # in the ending 
+                                    self.next_char();
+                                    // EOL or say new line or we stop here 
+                                    break;
+                                }
+                            }
+                        },
+                        Some(_)=>{
+                            self.next_char();
+                        }
+                        None=>{
+                            break;
+                        }
+                    }
+                }
+
+            }else{
+                // single line coment
+                self.next_char();
+                self.skip_single_line_comment();
+            }
+            
+         }
+         else{
+            self.skip_single_line_comment();
+         }
+    }
+    
     pub fn next_token(&mut self)->Option<Token>{
 
         use tokens::TokenType::*;
@@ -58,50 +119,13 @@ impl <'l> Lexer<'l> {
 
         let token = match curr_char {
             '#' =>{
-                //  consume first #
-                self.next_char();
-                // ## debug 
-                // you are at # debug 
-                // #debug
-                // you are at debug 
-                // case 1 : it's single line comment
-                // case 2 : there are actually only 2 ## and  its still single line comment
-                // for checking if its single line comment we just need to move it to next and peek for char after it
-                // if the char isn't # no worry just drop that line
-                // and then check the next char as well after 
-                if let Some((_,'#'))= self.peek_char(){
-                    // consume second #
-                    self.next_char();
-                    // you are at # debug
-                    // #####
-                    // ###
-                    if let Some((_,'#'))= self.peek_char(){
-                        // consume third #
-                        self.next_char(); 
-                    }else{
-                        // single line coment
-                        self.next_char();
-                        while let Some((_,'\n')) = self.peek_char(){
-                            self.next_char();
-                            while let Some((_,'#'))= self.peek_char(){
-                                self.next_char();
-                                
-                            }
-                        }
-                    }
-                } else{
-                    // single line comment
-                    self.next_char();
-                    while let Some((_,'\n')) = self.peek_char(){
-                        self.next_char();
-                    }
-                }
-                
-                Token {
-                    token_type: As,
-                    size: Size { start: 1, end: 1 },
-                }
+                self.skip_comments();
+                // this is intresting as this will help to avoid all of the comments and actually move towards the next token and then return that using recurrsion
+                return  self.next_token();
             },
+            '-'=>{
+                Token{token_type:As,size:Size{start:0,end:0}}
+            }
             _ => return None,
         };
     
@@ -160,4 +184,86 @@ mod tests {
 
         }
     }
+
+    #[test]
+    fn verify_single_line_comment() {
+        let program = "# sjdfsiljd";
+        let mut lexer = Lexer::new(program);
+    
+        let token = lexer.next_token();
+        assert_eq!(
+            token,
+            Some(Token {
+                token_type: tokens::TokenType::Eof,
+                size: Size { start: 0, end: 0 }
+            }),
+            "Failed to handle basic single-line comment"
+        );
+    }
+
+    #[test]
+    fn verify_proper_multiline_comment() {
+        let program = "
+            # intro
+            ###
+            slkefslekfme
+            ###
+        ";
+        let mut lexer = Lexer::new(program);
+
+        let token = lexer.next_token();
+        assert_eq!(
+            token,
+            Some(Token {
+                token_type: tokens::TokenType::Eof,
+                size: Size { start: 0, end: 0 }
+            }),
+            "Failed to handle  multi-line comment block"
+        );
+    }
+
+
+
+    #[test]
+    fn verify_padded_multiline_comment() {
+        let program = "
+            #####
+            dsgsegpsegoks
+            #####
+        ";
+        let mut lexer = Lexer::new(program);
+
+        let token = lexer.next_token();
+        assert_eq!(
+            token,
+            Some(Token {
+                token_type: tokens::TokenType::Eof,
+                size: Size { start: 0, end: 0 }
+            }),
+            "Failed to skip padded multi-line comment with extra hashes"
+        );
+    }
+
+    #[test]
+    fn verify_multiline_with_noise_hashes() {
+        let program = "
+            ### #
+            dsgsegpsegoks
+            # # ###
+        ";
+        let mut lexer = Lexer::new(program);
+
+        let token = lexer.next_token();
+        assert_eq!(
+            token,
+            Some(Token {
+                token_type: tokens::TokenType::Eof,
+                size: Size { start: 0, end: 0 }
+            }),
+            "Failed to process multiline comment containing irregular hash patterns"
+        );
+    }
+
+
+
 }
