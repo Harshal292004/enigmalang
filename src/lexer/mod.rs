@@ -58,46 +58,45 @@ impl <'l> Lexer<'l> {
 
         let token = match curr_char {
             '#' =>{
+                //  consume first #
+                self.next_char();
+                // ## debug 
+                // you are at # debug 
+                // #debug
+                // you are at debug 
                 // case 1 : it's single line comment
                 // case 2 : there are actually only 2 ## and  its still single line comment
                 // for checking if its single line comment we just need to move it to next and peek for char after it
                 // if the char isn't # no worry just drop that line
                 // and then check the next char as well after 
-                self.next_char();
-                // let (hash_offset, hash_char) = match self.peek_char(){
-                //     Some(h)=>{
-                //         if(h.1=='#'){
-                //             // check for multi line comments
-                //             self.next_char(); // as we know here we have 2 hash
-                //             // now we need to check whether we have 3 hashs?
-                //             let (third_hash_offset,third_hash_char)= match self.peek_char(){
-                //                 Some(t)=>{
-                //                     t
-                //                 }
-                //             } 
-                //         }else{
-                //             // advance to the next white space()
-                //             while let Some(t) = self.peek_char() {
-                //                 if t.1 != '\n'{
-                //                     self.next_char();   
-                //                 }
-                //             }
-
-                //             self.next_char(); // there will be atleast a single new line token 
-                //         }
-                //     },
-                //     None=>{
-
-                //     }
-
-                // }
-
-
+                if let Some((_,'#'))= self.peek_char(){
+                    // consume second #
+                    self.next_char();
+                    // you are at # debug
+                    // #####
+                    // ###
+                    if let Some((_,'#'))= self.peek_char(){
+                        // consume third #
+                        self.next_char(); 
+                    }else{
+                        // single line coment
+                        self.next_char();
+                        while let Some((_,'\n')) = self.peek_char(){
+                            self.next_char();
+                            while let Some((_,'#'))= self.peek_char(){
+                                self.next_char();
+                                
+                            }
+                        }
+                    }
+                } else{
+                    // single line comment
+                    self.next_char();
+                    while let Some((_,'\n')) = self.peek_char(){
+                        self.next_char();
+                    }
+                }
                 
-
-                
-                // case 2 : it's multi line comment
-
                 Token {
                     token_type: As,
                     size: Size { start: 1, end: 1 },
