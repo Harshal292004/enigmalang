@@ -32,7 +32,7 @@ impl <'l> Lexer<'l> {
     fn next_char(&mut self)->Option<(usize, char)>{
         self.chars.next()
     }
-    pub fn skip_whitespace(&mut self){
+    fn skip_whitespace(&mut self){
         while let Some(c) =  self.peek_char() {
             if c.1.is_whitespace(){
                 // continue 
@@ -42,7 +42,7 @@ impl <'l> Lexer<'l> {
             }
         }        
     }   
-    pub fn skip_single_line_comment(&mut self){
+    fn skip_single_line_comment(&mut self){
          // single line comment
          while let Some((_,ch)) = self.peek_char(){
             if ch=='\n'{
@@ -53,7 +53,7 @@ impl <'l> Lexer<'l> {
             self.next_char();
          }
     }
-    pub fn skip_comments(&mut self){
+    fn skip_comments(&mut self){
          //  consume first #
          self.next_char();
 
@@ -102,7 +102,10 @@ impl <'l> Lexer<'l> {
             self.skip_single_line_comment();
          }
     }
-    
+
+    fn single_char_token(&self,start:usize,token_type:tokens::TokenType)->Token{
+        Token{token_type:token_type,size:Size{start:start,end:start+1}}
+    }
     pub fn next_token(&mut self)->Option<Token>{
 
         use tokens::TokenType::*;
@@ -123,9 +126,39 @@ impl <'l> Lexer<'l> {
                 // this is intresting as this will help to avoid all of the comments and actually move towards the next token and then return that using recurrsion
                 return  self.next_token();
             },
-            '-'=>{
-                Token{token_type:As,size:Size{start:0,end:0}}
+
+            // single char tokens 
+            '{'=> self.single_char_token(curr_offset, LCurly),
+            '}'=> self.single_char_token(curr_offset, RCurly),
+            '('=>  self.single_char_token(curr_offset, LParen),
+            ')'=>  self.single_char_token(curr_offset, RParen),
+            ':'=>  self.single_char_token(curr_offset, Colon),
+            ','=>  self.single_char_token(curr_offset, Comma),
+            '.'=>  self.single_char_token(curr_offset,Dot),
+            '='=>{
+
+                // consume = 
+                self.next_char();
+                // case 1 : only equals 
+                let peek= self.peek_char();
+
+
+                match peek {
+                    Some((_,'='))=>{
+                        self.next_char();
+                        Token{token_type:EqualEqual,size:Size{start:curr_offset,end:2}}
+                    },
+                    _ => Token {
+                        token_type: Assign,
+                        size: Size {
+                            start: curr_offset,
+                            end: curr_offset + 1,
+                        },
+                    },
+                }
             }
+            // Operators
+            '0'=>  self.single_char_token(curr_offset, LCurly),
             _ => return None,
         };
     
