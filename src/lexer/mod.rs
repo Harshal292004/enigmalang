@@ -131,10 +131,36 @@ impl <'l> Lexer<'l> {
             },
         }
     }
+
+    fn read_ident(&mut self, start: usize) -> &str {
+        let mut end = start;
     
+        while let Some((idx, ch)) = self.peek_char() {
+            if ch.is_whitespace() || !ch.is_alphanumeric() && ch != '_' {
+                break;
+            }
+            end = idx + ch.len_utf8(); // update end to the end of the current character
+            self.next_char(); // move the cursor
+        }
+    
+        &self.program[start..end]
+    }
+    
+    
+    fn read_intliteral(&self){
+        
+    }
+
+    fn stirng_char_token(&mut self,start:usize,start_offset:usize,token_type:TokenType)->Token{
+        Token{
+            token_type:token_type,
+            size:Size{start:start,end:start+start_offset}
+        }
+    }
     pub fn next_token(&mut self)->Option<Token>{
 
         use tokens::TokenType::*;
+        use tokens::Literal::*;
         // skip the white spaces in the code
         self.skip_whitespace();
 
@@ -163,8 +189,8 @@ impl <'l> Lexer<'l> {
             '^'=> self.single_char_token(curr_offset,BitXor),
             '/'=> self.single_char_token(curr_offset, Division),
             '*'=> self.single_char_token(curr_offset, Asterisk),
-            '-'=>self.single_char_token(curr_offset, Minus),
-            '+'=>self.single_char_token(curr_offset, Plus),
+            '-'=> self.single_char_token(curr_offset, Minus),
+            '+'=> self.single_char_token(curr_offset, Plus),
 
             '.'=> self.double_char_token(curr_offset,'.',Range,Dot),
             '='=> self.double_char_token(curr_offset, '=', EqualEqual, Assign),
@@ -173,16 +199,41 @@ impl <'l> Lexer<'l> {
             '!'=> self.double_char_token(curr_offset, '=', NotEqual,Not),
             '|'=> self.double_char_token(curr_offset, '|', Or,BitOr),
             '&'=> self.double_char_token(curr_offset, '&', And, BitAnd),
-
             'a'..='z'| 'A'..='Z'|'_'=>{
-                Token{
-                    token_type:Eof,
-                    size:Size{start:0,end:0}
+                let ident= self.read_ident(curr_offset);
+                
+                match ident{
+                    "rune"=>self.stirng_char_token(curr_offset, 4, Bind),
+                    "summon"=>self.stirng_char_token(curr_offset, 6, Summon),
+                    "self"=>self.stirng_char_token(curr_offset, 4, SelfType),
+                    "draws"=>self.stirng_char_token(curr_offset, 5, Draws),
+                    "spell"=>self.stirng_char_token(curr_offset, 5, Spell),
+                    "chant"=>self.stirng_char_token(curr_offset, 5, Chant),
+                    "shatter"=>self.stirng_char_token(curr_offset, 7, Shatter),
+                    "phase"=>self.stirng_char_token(curr_offset, 5, Phase),
+                    "bind"=>self.stirng_char_token(curr_offset,4, Bind),
+                    "seal"=>self.stirng_char_token(curr_offset, 4, Seal),
+                    "reveal"=>self.stirng_char_token(curr_offset, 6, Reveal),
+                    "veil"=>self.stirng_char_token(curr_offset, 4, Veil),
+                    "divine"=>self.stirng_char_token(curr_offset, 6, Divine),
+                    "sigil"=>self.stirng_char_token(curr_offset, 5, Sigil),
+                    "default"=>self.stirng_char_token(curr_offset, 7, Default),
+                    "invoke"=>self.stirng_char_token(curr_offset, 6, Invoke),
+                    "linger"=>self.stirng_char_token(curr_offset, 6, Linger),
+                    "in"=>self.stirng_char_token(curr_offset, 2, In),
+                    "call"=>self.stirng_char_token(curr_offset, 4, Call),
+                    "as"=>self.stirng_char_token(curr_offset, 2, As),
+                    _=>self.stirng_char_token(curr_offset,ident.len(), Literal(Str(ident.to_string())))
                 }
             },
-            
-            // Operators
-            '0'=>  self.single_char_token(curr_offset, LCurly),
+            '0'..='9'=> {
+                let length:usize=4;
+                self.read_intliteral();
+                Token{
+                    token_type: Literal(Int(length)),
+                    size: Size{start:curr_offset,end:curr_offset+length}
+                }
+            } ,
             _ => return None,
         };
     

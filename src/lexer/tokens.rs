@@ -3,7 +3,7 @@ use super::size::Size;
 #[derive(Debug,PartialEq,Clone)]
 pub enum Literal{
     // Int variant of Literal contains i64 type
-    Int(i64),
+    Int(usize),
     Float(f64),
     Str(String)
 }
