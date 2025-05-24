@@ -1,6 +1,6 @@
 pub mod tokens;
 pub mod size;
-use std::str::CharIndices;
+use std::{f32::consts::E, str::CharIndices};
 use std::iter::Peekable;
 
 use size::Size;
@@ -136,20 +136,32 @@ impl <'l> Lexer<'l> {
         let mut end = start;
     
         while let Some((idx, ch)) = self.peek_char() {
-            if ch.is_whitespace() || !ch.is_alphanumeric() && ch != '_' {
+            if ch.is_alphanumeric() || ch == '_' {
+                self.next_char();
+                end = idx + ch.len_utf8(); // set end to the byte *after* current char
+            } else {
                 break;
             }
-            end = idx + ch.len_utf8(); // update end to the end of the current character
-            self.next_char(); // move the cursor
         }
     
         &self.program[start..end]
     }
     
+    fn read_int_literal(&mut self, start: usize) -> (usize, &str) {
+        let mut end = start;
     
-    fn read_intliteral(&self){
-        
+        while let Some((idx, ch)) = self.peek_char() {
+            if ch.is_ascii_digit() {
+                self.next_char();
+                end = idx + ch.len_utf8(); // ensures correct byte range
+            } else {
+                break;
+            }
+        }
+    
+        (end, &self.program[start..end])
     }
+    
 
     fn stirng_char_token(&mut self,start:usize,start_offset:usize,token_type:TokenType)->Token{
         Token{
@@ -227,11 +239,10 @@ impl <'l> Lexer<'l> {
                 }
             },
             '0'..='9'=> {
-                let length:usize=4;
-                self.read_intliteral();
-                Token{
-                    token_type: Literal(Int(length)),
-                    size: Size{start:curr_offset,end:curr_offset+length}
+                let (end, literal) = self.read_int_literal(curr_offset);
+                Token {
+                    token_type: Literal(Int(literal.parse().unwrap())),
+                    size: Size { start: curr_offset, end },
                 }
             } ,
             _ => return None,
