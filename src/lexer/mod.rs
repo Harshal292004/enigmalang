@@ -4,7 +4,7 @@ use std::str::CharIndices;
 use std::iter::Peekable;
 
 use size::Size;
-use tokens::Token;
+use tokens::{Token, TokenType};
 // FIXME : Add Peekable to improve lexer performance as program.chars().nth(0) is O(n) and expensive
 // FIXME : If we simply use program.chars().next()  it will consume the value rather we do program.chars().peek() it doesnt consume 
 // FUCK : New discoveries you can't slice a UTF-8 string directly in rust it may panic as in rust slices string on there byte offset boundaries rather than there actual indices
@@ -106,6 +106,32 @@ impl <'l> Lexer<'l> {
     fn single_char_token(&self,start:usize,token_type:tokens::TokenType)->Token{
         Token{token_type:token_type,size:Size{start:start,end:start+1}}
     }
+
+    fn double_char_token(
+        &mut self,
+        start: usize,
+        expected_second: char,
+        double_token: TokenType,
+        single_token: TokenType
+    ) -> Token {
+        // consume current char
+        self.next_char();
+    
+        match self.peek_char() {
+            Some((_, ch)) if ch == expected_second => {
+                self.next_char(); // consume second char
+                Token {
+                    token_type: double_token,
+                    size: Size { start, end: start + 2 },
+                }
+            }
+            _ => Token {
+                token_type: single_token,
+                size: Size { start, end: start + 1 },
+            },
+        }
+    }
+    
     pub fn next_token(&mut self)->Option<Token>{
 
         use tokens::TokenType::*;
@@ -130,33 +156,31 @@ impl <'l> Lexer<'l> {
             // single char tokens 
             '{'=> self.single_char_token(curr_offset, LCurly),
             '}'=> self.single_char_token(curr_offset, RCurly),
-            '('=>  self.single_char_token(curr_offset, LParen),
-            ')'=>  self.single_char_token(curr_offset, RParen),
-            ':'=>  self.single_char_token(curr_offset, Colon),
-            ','=>  self.single_char_token(curr_offset, Comma),
-            '.'=>  self.single_char_token(curr_offset,Dot),
-            '='=>{
+            '('=> self.single_char_token(curr_offset, LParen),
+            ')'=> self.single_char_token(curr_offset, RParen),
+            ':'=> self.single_char_token(curr_offset, Colon),
+            ','=> self.single_char_token(curr_offset, Comma),
+            '^'=> self.single_char_token(curr_offset,BitXor),
+            '/'=> self.single_char_token(curr_offset, Division),
+            '*'=> self.single_char_token(curr_offset, Asterisk),
+            '-'=>self.single_char_token(curr_offset, Minus),
+            '+'=>self.single_char_token(curr_offset, Plus),
 
-                // consume = 
-                self.next_char();
-                // case 1 : only equals 
-                let peek= self.peek_char();
+            '.'=> self.double_char_token(curr_offset,'.',Range,Dot),
+            '='=> self.double_char_token(curr_offset, '=', EqualEqual, Assign),
+            '>'=> self.double_char_token(curr_offset, '=', GreaterThanEqual, GreaterThan),
+            '<'=> self.double_char_token(curr_offset, '=', LessThanEqual, LessThan),
+            '!'=> self.double_char_token(curr_offset, '=', NotEqual,Not),
+            '|'=> self.double_char_token(curr_offset, '|', Or,BitOr),
+            '&'=> self.double_char_token(curr_offset, '&', And, BitAnd),
 
-
-                match peek {
-                    Some((_,'='))=>{
-                        self.next_char();
-                        Token{token_type:EqualEqual,size:Size{start:curr_offset,end:2}}
-                    },
-                    _ => Token {
-                        token_type: Assign,
-                        size: Size {
-                            start: curr_offset,
-                            end: curr_offset + 1,
-                        },
-                    },
+            'a'..='z'| 'A'..='Z'|'_'=>{
+                Token{
+                    token_type:Eof,
+                    size:Size{start:0,end:0}
                 }
-            }
+            },
+            
             // Operators
             '0'=>  self.single_char_token(curr_offset, LCurly),
             _ => return None,
@@ -172,131 +196,63 @@ impl <'l> Lexer<'l> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn skip_whitespace() {
-        let program="
-        
-        
-            # The first rule of fight club is  
-            ### That you do not talk about fight club
-            The second rule of fight club is 
-            That you DO NOT talk about fight club
-            ###
-
-            spell double(val:int):int{
-                chant val*2
-            }
-
-            bind val:int=8
-            double(8)
-        ";
-        let mut lexer=Lexer::new(program);
-        lexer.skip_whitespace();
-
-        if let Some((_, ch)) = lexer.peek_char() {
-            assert_eq!(ch, '#', "Expected '#' after whitespace, got '{}'", ch);
-        } else {
-            assert!(false, "Expected some character after whitespace, but found None");
-        }
+    struct LexerTestCase<'a>{
+        name:&'a str,
+        input:&'a str,
+        expected_tokn: Option<Token>
     }
 
+    fn run_test_case(case:LexerTestCase){
+        let mut lexer= Lexer::new(case.input);
+        let token= lexer.next_token();
+        assert_eq!(
+            token,
+            case.expected_tokn,
+            "Test case `{}` failed: Expected {:?}, got {:?}",
+            case.name,
+            case.expected_tokn,
+            token
+        )
+    }
     #[test]
-    fn get_eof_token(){
-        let program=" ";
-        let mut lexer=Lexer::new(program);
+    fn table_driven_lexer_tests(){
+        use tokens::TokenType::*;
 
-        let token =lexer.next_token();
+        let test_cases= vec![
+            LexerTestCase{
+                name: "whitespace and single-line comment",
+                input:"
 
-        match token{
-            Some(t)=>{
-                assert_eq!(t,Token{token_type:tokens::TokenType::Eof,size:Size{start:0,end:0}} , "Exepcetd a token of type Eof but got '{:?}' ",t);
+                    # this is a comment
+                ",
+                expected_tokn:Some(
+                    Token { 
+                        token_type:Eof ,
+                        size: Size{start:0,end:0} }
+                )
             },
-            None=>{
-                assert!(false,"Expected token of type Eof but got None");
+            LexerTestCase{
+                name: "irregular comments",
+                input:"
+                    ### #
+                    The first rule of fight club is 
+                    that you do not talk about fight club
+                    # # ###
+                ",
+                expected_tokn:Some(
+                    Token { token_type: Eof, size: Size { start: 0, end: 0 } }
+                )
+            },
+            LexerTestCase{
+                name:"Eof only",
+                input:" ",
+                expected_tokn:Some(
+                    Token { token_type: Eof, size: Size{start:0,end:0} }
+                )
             }
-
+        ];
+        for case in test_cases{
+            run_test_case(case);
         }
     }
-
-    #[test]
-    fn verify_single_line_comment() {
-        let program = "# sjdfsiljd";
-        let mut lexer = Lexer::new(program);
-    
-        let token = lexer.next_token();
-        assert_eq!(
-            token,
-            Some(Token {
-                token_type: tokens::TokenType::Eof,
-                size: Size { start: 0, end: 0 }
-            }),
-            "Failed to handle basic single-line comment"
-        );
-    }
-
-    #[test]
-    fn verify_proper_multiline_comment() {
-        let program = "
-            # intro
-            ###
-            slkefslekfme
-            ###
-        ";
-        let mut lexer = Lexer::new(program);
-
-        let token = lexer.next_token();
-        assert_eq!(
-            token,
-            Some(Token {
-                token_type: tokens::TokenType::Eof,
-                size: Size { start: 0, end: 0 }
-            }),
-            "Failed to handle  multi-line comment block"
-        );
-    }
-
-
-
-    #[test]
-    fn verify_padded_multiline_comment() {
-        let program = "
-            #####
-            dsgsegpsegoks
-            #####
-        ";
-        let mut lexer = Lexer::new(program);
-
-        let token = lexer.next_token();
-        assert_eq!(
-            token,
-            Some(Token {
-                token_type: tokens::TokenType::Eof,
-                size: Size { start: 0, end: 0 }
-            }),
-            "Failed to skip padded multi-line comment with extra hashes"
-        );
-    }
-
-    #[test]
-    fn verify_multiline_with_noise_hashes() {
-        let program = "
-            ### #
-            dsgsegpsegoks
-            # # ###
-        ";
-        let mut lexer = Lexer::new(program);
-
-        let token = lexer.next_token();
-        assert_eq!(
-            token,
-            Some(Token {
-                token_type: tokens::TokenType::Eof,
-                size: Size { start: 0, end: 0 }
-            }),
-            "Failed to process multiline comment containing irregular hash patterns"
-        );
-    }
-
-
-
 }

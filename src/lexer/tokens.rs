@@ -66,7 +66,7 @@ pub enum TokenType{
     Plus,          // +
     Minus,         // -
     Asterisk,      // *
-    Slash,         // /
+    Division,      // /
     BitAnd,        // &
     BitOr,         // |
     BitXor,        // ^
