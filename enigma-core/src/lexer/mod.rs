@@ -3,7 +3,6 @@ pub mod tokens;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use size::Size;
 use tokens::{Token, TokenType};
 
 // Use Peekable to avoid O(n) cost of chars().nth(0) and to peek without consuming.

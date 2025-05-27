@@ -27,6 +27,8 @@ jobs:
       with: 
         toolchain: stable
         override: true
+    - name: Change directory
+      run: cd enigma-core
     - name: Check formatting 
       run: cargo fmt -- --check # checks if code is formatted properly without changing files
     - name: Build

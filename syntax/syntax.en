@@ -1,0 +1,248 @@
+# ; isnt a part of the syntax at all its invalid to use anywhere in the code 
+# except for return statements its used ass a shorthand to return val=> val;
+#  comments fo like this (single line only lexing is difficult for multi line)
+
+# import modules
+get module math as m
+get module std.io as io
+
+# variables
+int x:= 4 # immutable
+mut int y:= 9 # muttable
+
+# functions with blocks @<function_name>(<type> <call_site_name>%<implementation_name>, <type> <implementation_name>)::<return_type>{}
+# functions @<function_name>(<type> <call_site_name>%<implementation_name>,<type> <implementation_name>)::<return_type>->implementation_name 
+
+# inline function
+@sum(int a,int b)::int -> a + b;
+
+# block function
+@diff(int a,int b)::int {
+    return a - b
+}
+
+# mutable arg
+@mutate(byte buf)::byte {
+    buf = buf + 1
+    buf;
+}
+
+# mutable arg
+@mutate_mut(&mut byte buf)::unit{
+    buf = buf + 1
+}
+
+# call-site aware
+@log_event(int trace_id%id ,string msg)::unit {
+    # code
+}
+
+int add:=sum(2,3)
+int sub:=diff(3,4)
+byte by:=mutate(0XAB)
+mut byte by:=0XAB
+mutate_mut(by)
+log_event(trace_id:4,"testing")
+
+
+# Expression/Anonymous functions
+# experessions also use the return keyword as return val and shorthand val;
+int foo:={
+    int u=8
+    int y=9
+    u+y
+}
+
+# conditionals
+
+# 0 is false and 1(or any value) is true
+# if/esle is also an expression and the output will depend on the type assigned to variable
+int foo:=if 9==9 {
+    9
+}else{
+    0
+}
+
+if add(){
+
+}else{
+
+}
+
+# we will deal with pattern matching later
+
+# loop loops are expressions
+# while, foor are staments returning unit by default
+for i in 1..2{
+    print(i+1)
+    print(i)
+}
+
+while i<1{
+    i++
+}
+
+
+# loop don't have shorthand
+loop{
+    if i>10 {
+        break i # break return i
+    }
+}
+
+# records, unions, tuples 
+
+record human {
+    name:string
+    age:int 
+    karma:int
+    health:Option[int] // var are optional when we intiate
+}
+
+implement human{
+    pub @new(string name%name ,int age%age,int karma%karma )::human {
+        human { name:name, age:age, karma:karma };
+    }
+
+    pub @speak(self) {
+        print("Sab golmal hai.....Babu bhaiya mujhe gana sunai de raha hai")
+    }
+
+    pub @cough(mut self){
+        # problem as health might not be intialized how to undale this situtation in enigma we can take or match what rust does if let but than we need to introduce newer tweaks in the syntax
+        self::health-=10
+    }
+}
+
+union status[T]{
+    Ok(T)
+    Err(string)
+}
+
+# using them as types 
+
+raju human :=human::new(name:"Raju",age:28,karma:-100000)
+baburao human :=human::new(name:"Babu Bhaiya",age:68,karma:-1000)
+shyam human :=human{name:"Shyam",age:27,karma:100,health:100}
+
+shyam::speak()
+shyam::cough()
+
+# protocols can be used to provide functionalities to a record
+
+live protoc{
+    @eat(self)::string
+    @socialize()
+    @read()
+}
+
+implement live for human{
+    @eat(self)::string{
+        "Babu Bhaiay mai ${self::name} hun";
+    }
+    @socialize(){
+        print("Aur bhai!!")
+    }
+
+    @read(){
+        print("Ek kireydar ne ghar malak ka gal daba kar ki hatya")
+    }
+}
+
+
+# Tuple type is anonymous:
+(int, string, byte) x := (42, "hello", 0xFF)
+
+# Tuple destructuring: 
+# $= destructers
+(int a,string b, byte c) $= x
+
+# Passing tuple as param or returning tuple from function
+@coords()::(int, int) {
+    return (1, 2)
+}
+
+
+# genrics
+
+@add[T](T lis)::T{
+    return lis
+}
+
+record human[T]{
+    program:T  
+}
+
+# Error Handling 
+# When we explicitly know where function will fail and no need of error messages
+union Option[T]{
+    Some(T),
+    None
+}
+
+implement Option[T]{
+    pub @extract[T](self)->T{
+        match self{
+            Option::Some(T): T;,
+            Option::None: exit("") 
+        }
+    }
+}
+
+
+union Result[T,E]{
+    Ok(T),
+    Err(E)
+}
+
+
+# pattern matching (match are experssions typed with the help of the varaibels type)
+
+match drink {
+    case Option::Some("lemonade") : print("Yuck! Too sugary."),
+    case Option::Some("inner")    : print("How nice."),
+    case Option::None             : print("No drink? Oh well.")
+}
+
+match drink {
+    case Option::Some("lemonade") : print("Yuck! Too sugary."),
+    case Option::Some("inner")    : print("How nice."),
+    case _            : print("Either its Option::none or Option::some shitty string")
+}
+
+
+# Unpacking with ?
+
+# ? is a simple way of using Option either it returns Option::None or T ? calls extract
+
+# Result
+# passing errors
+
+@pass_error()::Result[unit,str]{
+
+}
+
+# Refrences 
+
+int x:= 4 # immutable
+ref int y:= ref x
+
+# Derefrence 
+int val:= deref y
+
+# Raw pointers
+# this are just like c's pointers and can directly communicate with the actual memory of system
+raw_ref int val:= raw_ref x
+
+# can only be Derefrence in unsafe
+
+unsafe{
+    int val:=deref val
+}
+
+# inline assembly 
+
+asm{
+    "mov eax , 1"
+    "int 0x80"
+}

@@ -1,6 +1,2 @@
-mystic/target
 rust.md
-
-# Added by cargo
-
-/target
+*/target
