@@ -28,7 +28,7 @@ mut int y:= 9 # muttable
 }
 
 # mutable arg
-@mutate_mut(&mut byte buf)::unit{
+@mutate_mut(mut byte buf)::unit{
     buf = buf + 1
 }
 
@@ -48,8 +48,8 @@ log_event(trace_id:4,"testing")
 # Expression/Anonymous functions
 # experessions also use the return keyword as return val and shorthand val;
 int foo:={
-    int u=8
-    int y=9
+    int u:=8
+    int y:=9
     u+y
 }
 
@@ -57,7 +57,7 @@ int foo:={
 
 # 0 is false and 1(or any value) is true
 # if/esle is also an expression and the output will depend on the type assigned to variable
-int foo:=if 9==9 {
+int foo:= if 9==9 {
     9
 }else{
     0
@@ -121,25 +121,22 @@ union status[T]{
 
 # using them as types 
 
-raju human :=human::new(name:"Raju",age:28,karma:-100000)
-baburao human :=human::new(name:"Babu Bhaiya",age:68,karma:-1000)
-shyam human :=human{name:"Shyam",age:27,karma:100,health:100}
+human taju :=human::new(name:"Raju",age:28,karma:-100000)
+human baburao:=human::new(name:"Babu Bhaiya",age:68,karma:-1000)
+human shyam:=human{name:"Shyam",age:27,karma:100,health:100}
 
 shyam::speak()
 shyam::cough()
 
 # protocols can be used to provide functionalities to a record
 
-live protoc{
+protoc live{
     @eat(self)::string
     @socialize()
     @read()
 }
 
 implement live for human{
-    @eat(self)::string{
-        "Babu Bhaiay mai ${self::name} hun";
-    }
     @socialize(){
         print("Aur bhai!!")
     }
@@ -183,8 +180,8 @@ union Option[T]{
 implement Option[T]{
     pub @extract[T](self)->T{
         match self{
-            Option::Some(T): T;,
-            Option::None: exit("") 
+            case Option::Some(T): T;,
+            case Option::None: exit("") 
         }
     }
 }

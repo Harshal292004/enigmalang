@@ -2,86 +2,93 @@ use super::size::Size;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
-    // Int variant of Literal contains i64 type
     Int(usize),
     Float(f64),
     Str(String),
+    Bool(bool),
+    Char(char),
 }
 
-// Debug for {:?}
-// PartialEq for comparison
-// Eq for stricter comparison
-// Clone for `.clone()`
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     // Keywords
-    // OOP
-    Rune,     // rune
-    Summon,   // summon
-    SelfType, // self
-    Draws,    // draws
+    Get, // get
+    Module, // module
+    As, // as
+    Mut, // mut 
+    Return, // return 
+    If, // if
+    Else, // else 
+    For, // for 
+    In, // in
+    Loop, // loop 
+    While, // while
+    Match, // match
+    Case, // case
+    Pub, // pub
+    Impl, // implement
+    Record, // record
+    Union, // union
+    Ref, // ref
+    Deref, // deref
+    RawRef, // raw_ref
+    Unsafe, // unsafe
+    Protoc, // protoc
+    Asm, // asm
+    Continue, // continue
+    Break, // break
 
-    // Func
-    Spell,   // spell
-    Chant,   // chant
-    Shatter, // shatter
-    Phase,   // phase
-
-    // Declarations
-    Bind, // bind
-    Seal, // seal
-
-    //  Conditionals
-    Reveal,  // reveal
-    Veil,    // veil
-    Divine,  // divine
-    Sigil,   // sigil
-    Default, // default
-
-    // Loops
-    Invoke, // invoke
-    Linger, // linger
-    Range,  // ..
-    In,     // in
-
-    // Pkg Management
-    Call, // call
-    As,   //as
-
-    // Syntax
-    LCurly, // {
-    RCurly, // }
-    LParen, // (
-    RParen, // )
-    Colon,  // :
-    Comma,  // ,
-    Dot,    // .
-    Assign, // =
+    // Symbols & Operators
+    Assign,         // :=
+    Colon,          // :
+    DoubleColon,    // ::
+    Arrow,          // ->
+    Comma,          // ,
+    Dot,            // .
+    DotDot,         // ..
+    Percent,        // %
+    LParen,         // (
+    RParen,         // )
+    LCurly,         // {
+    RCurly,         // }
+    LSquare,        // [
+    RSquare,        // ]
+    UnderScore,     // _
+    Destructure,    // $=
+    Question,       // ?
 
     // Operators
-    And,              // &&
-    Or,               // ||
-    Not,              // !
-    Plus,             // +
-    Minus,            // -
-    Asterisk,         // *
-    Division,         // /
-    BitAnd,           // &
-    BitOr,            // |
-    BitXor,           // ^
-    EqualEqual,       // ==
-    NotEqual,         // !=
-    LessThan,         // <
-    GreaterThan,      // >
-    LessThanEqual,    // <=
-    GreaterThanEqual, // >=
-
-    // Identifiers and literals
-    Identifier, // variable names, type names
-    // Literal variant of TokenType holds Literal type
+    Plus,           // +
+    Minus,          // -
+    PlusEqual,      // +=
+    MinusEqual,      // -=
+    Asterisk,       // *
+    AsteriskEqual,  // *=
+    Division,       // /
+    SlashEqual,     // /=
+    Ampersand,      // &
+    AmpersandAmpersand, // &&
+    Pipe,           // |
+    PipePipe,       // ||
+    Carrot,         // ^
+    Exclaim,        // !
+    EqualEqual,     // ==
+    ExclaimEqual,   // !=
+    LessThan,       // <
+    GreaterThan,    // >
+    LessThanEqual,  // <=
+    GreaterThanEqual,// >=
+    PlusPlus,       // ++
+    MinusMinus,      // --
+    Dollar , // $=
+    // Special
+    Func,           // @
+    ReturnSemi,     // shorthand return `val;`
+    
+    // Values
+    Identifier,
     Literal(Literal),
-
-    Eof, // end of file
+    Eof
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -93,11 +100,8 @@ pub struct Token {
 impl Token {
     pub fn new(start: usize, end: usize, token_type: TokenType) -> Self {
         Self {
-            token_type: token_type,
-            size: Size {
-                start: start,
-                end: end,
-            },
+            token_type,
+            size: Size { start, end },
         }
     }
 }
