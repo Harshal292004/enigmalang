@@ -12,83 +12,83 @@ pub enum Literal {
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     // Keywords
-    Get, // get
-    Module, // module
-    As, // as
-    Mut, // mut 
-    Return, // return 
-    If, // if
-    Else, // else 
-    For, // for 
-    In, // in
-    Loop, // loop 
-    While, // while
-    Match, // match
-    Case, // case
-    Pub, // pub
-    Impl, // implement
-    Record, // record
-    Union, // union
-    Ref, // ref
-    Deref, // deref
-    RawRef, // raw_ref
-    Unsafe, // unsafe
-    Protoc, // protoc
-    Asm, // asm
+    Get,      // get
+    Module,   // module
+    As,       // as
+    Mut,      // mut
+    Return,   // return
+    If,       // if
+    Else,     // else
+    For,      // for
+    In,       // in
+    Loop,     // loop
+    While,    // while
+    Match,    // match
+    Case,     // case
+    Pub,      // pub
+    Impl,     // implement
+    Record,   // record
+    Union,    // union
+    Ref,      // ref
+    Deref,    // deref
+    RawRef,   // raw_ref
+    Unsafe,   // unsafe
+    Protoc,   // protoc
+    Asm,      // asm
     Continue, // continue
-    Break, // break
+    Break,    // break
 
     // Symbols & Operators
-    Assign,         // :=
-    Colon,          // :
-    DoubleColon,    // ::
-    Arrow,          // ->
-    Comma,          // ,
-    Dot,            // .
-    DotDot,         // ..
-    Percent,        // %
-    LParen,         // (
-    RParen,         // )
-    LCurly,         // {
-    RCurly,         // }
-    LSquare,        // [
-    RSquare,        // ]
-    UnderScore,     // _
-    Destructure,    // $=
-    Question,       // ?
+    Assign,      // :=
+    Colon,       // :
+    DoubleColon, // ::
+    Arrow,       // ->
+    Comma,       // ,
+    Dot,         // .
+    DotDot,      // ..
+    Percent,     // %
+    LParen,      // (
+    RParen,      // )
+    LCurly,      // {
+    RCurly,      // }
+    LSquare,     // [
+    RSquare,     // ]
+    UnderScore,  // _
+    Destructure, // $=
+    Question,    // ?
 
     // Operators
-    Plus,           // +
-    Minus,          // -
-    PlusEqual,      // +=
-    MinusEqual,      // -=
-    Asterisk,       // *
-    AsteriskEqual,  // *=
-    Division,       // /
-    SlashEqual,     // /=
-    Ampersand,      // &
+    Plus,               // +
+    Minus,              // -
+    PlusEqual,          // +=
+    MinusEqual,         // -=
+    Asterisk,           // *
+    AsteriskEqual,      // *=
+    Slash,              // /
+    SlashEqual,         // /=
+    Ampersand,          // &
     AmpersandAmpersand, // &&
-    Pipe,           // |
-    PipePipe,       // ||
-    Carrot,         // ^
-    Exclaim,        // !
-    EqualEqual,     // ==
-    ExclaimEqual,   // !=
-    LessThan,       // <
-    GreaterThan,    // >
-    LessThanEqual,  // <=
-    GreaterThanEqual,// >=
-    PlusPlus,       // ++
-    MinusMinus,      // --
-    Dollar , // $=
+    Pipe,               // |
+    PipePipe,           // ||
+    Carrot,             // ^
+    EqualEqual,         // ==
+    Exclaim,            // !
+    ExclaimEqual,       // !=
+    LessThan,           // <
+    GreaterThan,        // >
+    LessThanEqual,      // <=
+    GreaterThanEqual,   // >=
+    PlusPlus,           // ++
+    MinusMinus,         // --
+    Dollar,             // $=
     // Special
-    Func,           // @
-    ReturnSemi,     // shorthand return `val;`
-    
+    Func,       // @
+    ReturnSemi, // shorthand return `val;`
+
     // Values
     Identifier,
     Literal(Literal),
-    Eof
+    Eof,
 }
 
 #[derive(Debug, PartialEq, Clone)]

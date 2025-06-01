@@ -1,10 +1,9 @@
 pub mod size;
 pub mod tokens;
-use core::panic;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use tokens::{Token, TokenType,Literal};
+use tokens::{Literal, Token, TokenType};
 
 // Use Peekable to avoid O(n) cost of chars().nth(0) and to peek without consuming.
 // Rust strings are UTF-8; slicing with arbitrary indices can panic.
@@ -26,13 +25,13 @@ impl<'l> Lexer<'l> {
     fn peek(&mut self) -> Option<(usize, char)> {
         self.chars.peek().copied()
     }
-    fn next(&mut self) -> Option<(usize, char)> {
+    fn advance(&mut self) -> Option<(usize, char)> {
         self.chars.next()
     }
     fn skip_whitespace(&mut self) {
         while let Some((_, c)) = self.peek() {
             if c.is_whitespace() {
-                self.next();
+                self.advance();
             } else {
                 break;
             }
@@ -41,21 +40,21 @@ impl<'l> Lexer<'l> {
     fn skip_comment(&mut self) {
         while let Some((_, ch)) = self.peek() {
             if ch == '\n' {
-                self.next();
+                self.advance();
                 break;
             }
-            self.next();
+            self.advance();
         }
     }
     fn read_string_literal(&mut self, start: usize) -> Token {
         let mut end = start;
         let mut value = String::new();
-        self.next(); // Consume opening quote
+        self.advance(); // Consume opening quote
 
-        while let Some((idx, ch)) = self.next() {
+        while let Some((idx, ch)) = self.advance() {
             match ch {
                 '\\' => {
-                    if let Some((_, esc)) = self.next() {
+                    if let Some((_, esc)) = self.advance() {
                         end = idx + 1;
                         match esc {
                             'n' => value.push('\n'),
@@ -73,7 +72,7 @@ impl<'l> Lexer<'l> {
                     }
                 }
                 '"' => {
-                    end = idx + 1; // Include closing quote
+                    end = idx + 1;
                     break;
                 }
                 _ => {
@@ -83,18 +82,14 @@ impl<'l> Lexer<'l> {
             }
         }
 
-        Token::new(
-            start,
-            end - start,
-            TokenType::Literal(Literal::Str(value)),
-        )
+        Token::new(start, end - start, TokenType::Literal(Literal::Str(value)))
     }
-    
+
     fn read_char_literal(&mut self, start: usize) -> Token {
-        self.next(); // Consume opening quote
-        let (mut value, mut end) = match self.next() {
+        self.advance(); // Consume opening quote
+        let (value, mut end) = match self.advance() {
             Some((idx, '\\')) => {
-                if let Some((_, esc)) = self.next() {
+                if let Some((_, esc)) = self.advance() {
                     let ch = match esc {
                         'n' => '\n',
                         't' => '\t',
@@ -112,99 +107,19 @@ impl<'l> Lexer<'l> {
             None => panic!("Unterminated char literal"),
         };
 
-        if let Some((idx, '\'')) = self.next() {
+        if let Some((idx, '\'')) = self.advance() {
             end = idx + 1;
         } else {
             panic!("Expected closing quote");
         }
 
-        Token::new(
-            start,
-            end - start,
-            TokenType::Literal(Literal::Char(value)),
-        )
+        Token::new(start, end - start, TokenType::Literal(Literal::Char(value)))
     }
-    fn read_identifier(&mut self, start:usize)-> &str{
+    fn read_identifier(&mut self, start: usize) -> &str {
         let mut end = start;
-        while let Some((idx,ch))=self.peek() {
+        while let Some((idx, ch)) = self.peek() {
             if ch.is_ascii_alphanumeric() || ch == '_' {
-                self.next();
-                end= idx+ch.len_utf8();
-            }else{
-                break;
-            }
-        }
-
-        &self.program[start..end]
-    }
-    fn double_char_token(
-        &mut self,
-        start: usize,
-        expected_second: char,
-        double_token: TokenType,
-        single_token: TokenType,
-    ) -> Token {
-        // consume current char
-        self.next();
-
-        match self.peek() {
-            Some((_, ch)) if ch == expected_second => {
-                self.next(); // consume second char
-                Token::new(start, 2, double_token)
-            }
-            _ => Token::new(start, 1, single_token),
-        }
-    }
-
-    fn  build_operator(
-        &mut self,
-        start:usize,
-        curr_char:char,
-        double_token:TokenType,
-        equal_token:TokenType,
-        single_token:TokenType
-    )-> Token{
-        self.next();
-        match self.peek(){
-            Some((_,c)) if c==curr_char =>{
-                self.next();
-                Token::new(start,2,double_token)
-            },
-            Some((_,'='))=>{
-                self.next();
-                Token::new(start,2,equal_token)
-            },
-            None =>{
-                self.next();
-                Token::new(start,2,single_token)    
-            }         
-        }
-    }
-
-    fn read_string_literal(&mut self, start: usize) -> &str {
-        let mut end = start;
-        // consume "
-        self.next();
-
-        while let Some((idx, ch)) = self.peek() {
-            if ch.is_alphanumeric() || ch == '_' || ch== '\\' || ch.is_whitespace() {
-                self.next();
-                end = idx + ch.len_utf8();
-            } else {
-                // consume "
-                self.next();
-                break;
-            }
-        }
-        &self.program[start..end]
-    }
-
-    fn read_identifier(&mut self , start:usize) -> &str{
-        let mut end = start;
-
-        while let Some((idx, ch)) = self.peek() {
-            if ch.is_alphanumeric() || ch == '_'  {
-                self.next();
+                self.advance();
                 end = idx + ch.len_utf8();
             } else {
                 break;
@@ -212,551 +127,532 @@ impl<'l> Lexer<'l> {
         }
         &self.program[start..end]
     }
-    fn read_int_literal(&mut self, start: usize) -> (usize,bool, &str) {
+    fn read_number_literal(&mut self, start: usize) -> Token {
         let mut end = start;
-        let mut is_float:bool = false; 
+        let mut is_float = false;
+        let mut has_exponent = false;
+        let mut valid = true;
+
         while let Some((idx, ch)) = self.peek() {
-            if ch.is_ascii_digit() || ch == '.'{
-                if ch == '.' {
-                    is_float=true;
+            match ch {
+                '0'..='9' => {
+                    self.advance();
+                    end = idx + 1;
                 }
-                self.next();
-                end = idx + ch.len_utf8();
-            } else {
-                break;
+                '.' => {
+                    if is_float || has_exponent {
+                        valid = false;
+                    }
+                    is_float = true;
+                    self.advance();
+                    end = idx + 1;
+                }
+                'e' | 'E' => {
+                    if has_exponent {
+                        valid = false;
+                    }
+                    has_exponent = true;
+                    self.advance();
+                    end = idx + 1;
+
+                    if let Some((_, sign)) = self.peek() {
+                        if sign == '+' || sign == '-' {
+                            self.advance();
+                            end += 1;
+                        }
+                    }
+                }
+                _ => break,
             }
         }
 
-        (end, is_float,&self.program[start..end])
+        let literal_str = &self.program[start..end];
+        if !valid {
+            panic!("Invalid number format: {}", literal_str);
+        }
+
+        if is_float || has_exponent {
+            let value = literal_str.parse().unwrap();
+            Token::new(
+                start,
+                end - start,
+                TokenType::Literal(Literal::Float(value)),
+            )
+        } else {
+            let value = literal_str.parse().unwrap();
+            Token::new(start, end - start, TokenType::Literal(Literal::Int(value)))
+        }
     }
 
-    fn stirng_char_token(
-        &mut self,
-        start: usize,
-        start_offset: usize,
-        token_type: TokenType,
-    ) -> Token {
-        Token::new(start, start_offset, token_type)
+    fn consume_single(&mut self, token_type: TokenType) -> Token {
+        let (start, _) = self.advance().unwrap();
+        Token::new(start, 1, token_type)
     }
-    pub fn next_token(&mut self) -> Token {
-        use tokens::Literal::*;
-        use tokens::TokenType::*;
+
+    fn consume_double(
+        &mut self,
+        second_char: char,
+        double_type: TokenType,
+        default_type: TokenType,
+    ) -> Token {
+        let (start, _) = self.advance().unwrap();
+        match self.peek() {
+            Some((_, c)) if c == second_char => {
+                self.advance();
+                Token::new(start, 2, double_type)
+            }
+            _ => Token::new(start, 1, default_type),
+        }
+    }
+
+    fn consume_double_with_panic(&mut self, second_char: char, default_type: TokenType) -> Token {
+        let (start, _) = self.advance().unwrap();
+        match self.peek() {
+            Some((_, c)) if c == second_char => {
+                self.advance();
+                Token::new(start, 2, default_type)
+            }
+            _ => panic!("Undetermined token"),
+        }
+    }
+
+    fn consume_triple(
+        &mut self,
+        second_char: char,
+        double_type: TokenType,
+        third_char: char,
+        triple_type: TokenType,
+        default_type: TokenType,
+    ) -> Token {
+        let (start, _) = self.advance().unwrap();
+        match self.peek() {
+            Some((_, c)) if c == second_char => {
+                self.advance();
+                Token::new(start, 2, double_type)
+            }
+            Some((_, c)) if c == third_char => {
+                self.advance();
+                Token::new(start, 2, triple_type)
+            }
+            _ => Token::new(start, 1, default_type),
+        }
+    }
+
+    fn consume_quad(
+        &mut self,
+        second_char: char,
+        double_type: TokenType,
+        third_char: char,
+        triple_type: TokenType,
+        fourth_char: char,
+        fourth_type: TokenType,
+        default_type: TokenType,
+    ) -> Token {
+        let (start, _) = self.advance().unwrap();
+        match self.peek() {
+            Some((_, c)) if c == second_char => {
+                self.advance();
+                Token::new(start, 2, double_type)
+            }
+            Some((_, c)) if c == third_char => {
+                self.advance();
+                Token::new(start, 2, triple_type)
+            }
+            Some((_, c)) if c == fourth_char => {
+                self.advance();
+                Token::new(start, 2, fourth_type)
+            }
+            _ => Token::new(start, 1, default_type),
+        }
+    }
+
+    fn handle_identifier(&mut self, start: usize) -> Token {
+        use tokens::{Literal, TokenType::*};
+        let ident = self.read_identifier(start);
+        let token_type = match ident {
+            "get" => Get,
+            "module" => Module,
+            "as" => As,
+            "mut" => Mut,
+            "return" => Return,
+            "if" => If,
+            "else" => Else,
+            "for" => For,
+            "in" => In,
+            "loop" => Loop,
+            "while" => While,
+            "match" => Match,
+            "case" => Case,
+            "pub" => Pub,
+            "implement" => Impl,
+            "record" => Record,
+            "union" => Union,
+            "ref" => Ref,
+            "deref" => Deref,
+            "raw_ref" => RawRef,
+            "unsafe" => Unsafe,
+            "protoc" => Protoc,
+            "asm" => Asm,
+            "continue" => Continue,
+            "break" => Break,
+            "true" => TokenType::Literal(Literal::Bool(true)),
+            "false" => TokenType::Literal(Literal::Bool(false)),
+            _ => Identifier,
+        };
+        Token::new(start, ident.len(), token_type)
+    }
+
+    pub fn advance_token(&mut self) -> Token {
+        use TokenType::*;
         // skip the white spaces in the code
         self.skip_whitespace();
 
-        let (curr_offset, curr_char) = match self.peek() {
-            Some(c) => c,
+        let (start, ch) = match self.peek() {
+            Some((pos, c)) => (pos, c),
             None => return Token::new(0, 0, Eof),
         };
 
-        let token = match curr_char {
+        match ch {
             '#' => {
                 self.skip_comment();
-                // Helps skip comments and recursively advance to the next token for clean parsing
-                return self.next_token();
+                return self.advance_token();
             }
-            // single char tokens
-            '@' => self.single_char_token(curr_offset, Func),
-            '{' => self.single_char_token(curr_offset, LCurly),
-            '}' => self.single_char_token(curr_offset, RCurly),
-            '(' => self.single_char_token(curr_offset, LParen),
-            ')' => self.single_char_token(curr_offset, RParen),
-            '[' => self.single_char_token(curr_offset, LSquare),
-            ']' => self.single_char_token(curr_offset, RSquare),
-            ',' => self.single_char_token(curr_offset, Comma),
-            '^' => self.single_char_token(curr_offset, Carrot),
-            '/' => self.single_char_token(curr_offset, Division),
-            '*' => self.double_char_token(curr_offset,'=',AsteriskEqual,Asterisk),
-            '-' => self.build_operator(curr_offset, curr_char, MinusMinus, MinusEqual, Minus),
-            '+' => self.build_operator(curr_offset, curr_char, PlusPlus, PlusEqual, Plus),
-            ':' => self.build_operator(curr_offset, curr_char,DoubleColon, Assign, Colon),
-            '.' => self.double_char_token(curr_offset, '.', DotDot, Dot),
-            '=' => self.double_char_token(curr_offset, '=', EqualEqual, Assign),
-            '>' => self.double_char_token(curr_offset, '=', GreaterThanEqual, GreaterThan),
-            '<' => self.double_char_token(curr_offset, '=', LessThanEqual, LessThan),
-            '!' => self.double_char_token(curr_offset, '=', ExclaimEqual,Exclaim),
-            '|' => self.double_char_token(curr_offset, '|', PipePipe, Pipe),
-            '&' => self.double_char_token(curr_offset, '&', AmpersandAmpersand, Ampersand),
-            '$' => self.double_char_token(curr_offset, '=', Destructure, Dollar),
-            '"'=> {
-                let ident = self.read_string_literal(curr_offset);
-
-                match ident {
-                    _ => Token::new(curr_offset, ident.len(), Literal(Str(ident.to_string()))),
-                }
-            }
-            '\''=>{
-                // consume '
-                self.next();
-                
-                match self.peek(){
-                    Some((_,'\\'))=>{
-                        // consume \
-                        self.next();
-                        // consume char
-                        let i=self.next().unwrap();
-                        // consume '
-                        self.next();
-                        Token::new(curr_offset, 4, Literal(Char(('{i.1}'))))
-                        
-                    }
-                    _ => {
-                        // consume char
-                        let i=self.next().unwrap();
-                        // consume '
-                        self.next();
-                     
-                        Token::new(curr_offset, 3,Literal(Char('{}'))),
-                    }
-                }     
-            }
-            'a'..='z' | 'A'..='Z' | '_' => {
-
-                match self.peek() {
-                    Some((_,ch)) if ch.is_whitespace()=>{
-                        Token::new(curr_offset, 1, UnderScore)
-                    },
-                    _=>{
-                        let ident = self.read_identifier(curr_offset);
-
-                        match ident {
-                            "get" => Token::new(curr_offset, 4, Get),
-                            "module" => Token::new(curr_offset, 6, Module),
-                            "as" => Token::new(curr_offset, 4, As),
-                            "mut" => Token::new(curr_offset, 5, Mut),
-                            "return" => Token::new(curr_offset, 5, Return),
-                            "if" => Token::new(curr_offset, 5, If),
-                            "else" => Token::new(curr_offset, 7, Else),
-                            "for" => Token::new(curr_offset, 5, For),
-                            "in" => Token::new(curr_offset, 4, In),
-                            "loop" => Token::new(curr_offset, 4, Loop),
-                            "while" => Token::new(curr_offset, 6, While),
-                            "match" => Token::new(curr_offset, 4, Match),
-                            "case" => Token::new(curr_offset, 6, Case),
-                            "pub" => Token::new(curr_offset, 5, Pub),
-                            "implement" => Token::new(curr_offset, 7, Impl),
-                            "record" => Token::new(curr_offset, 6, Record),
-                            "union" => Token::new(curr_offset, 6, Union),
-                            "ref" => Token::new(curr_offset, 2, In),
-                            "deref" => Token::new(curr_offset, 4, Deref),
-                            "raw_ref" => Token::new(curr_offset, 2, RawRef),
-                            "unsafee" => Token::new(curr_offset, 2, Unsafe),
-                            "protoc" => Token::new(curr_offset, 2, Protoc),
-                            "asm" => Token::new(curr_offset, 2,Asm),
-                            "continue" => Token::new(curr_offset, 2, Continue),
-                            "break"=>Token::new(curr_offset, 2, Break),
-                            "true"=> Token::new(curr_offset,4,Literal(Bool(true))),
-                            "false"=> Token::new(curr_offset,4,Literal(Bool(false))), 
-                            _ => panic!("No identifier found")                       }
-
-                    
-                    } 
-                }
-            },
-            '0'..='9' => {
-                let (end,is_float, literal) = self.read_int_literal(curr_offset);
-                if is_float{
-                    Token::new(
-                        curr_offset,
-                        end - curr_offset,
-                        Literal(Float(literal.parse().unwrap())),
-                    )
-                }else{
-                    Token::new(
-                        curr_offset,
-                        end - curr_offset,
-                        Literal(Int(literal.parse().unwrap())),
-                    )    
-                }
-            }
-            _ => panic!(""),
-        };
-
-        token
+            '@' => self.consume_single(Func),
+            '{' => self.consume_single(LCurly),
+            '}' => self.consume_single(RCurly),
+            '(' => self.consume_single(LParen),
+            ')' => self.consume_single(RParen),
+            '[' => self.consume_single(LSquare),
+            ']' => self.consume_single(RSquare),
+            ',' => self.consume_single(Comma),
+            '^' => self.consume_single(Carrot),
+            '%' => self.consume_single(Percent),
+            '?' => self.consume_single(Question),
+            ';' => self.consume_single(ReturnSemi),
+            '"' => self.read_string_literal(start),
+            '\'' => self.read_char_literal(start),
+            ':' => self.consume_triple(':', DoubleColon, '=', Assign, Colon),
+            '+' => self.consume_triple('+', PlusPlus, '=', PlusEqual, Plus),
+            '-' => self.consume_quad('-', MinusMinus, '=', MinusEqual, '>', Arrow, Minus),
+            '*' => self.consume_double('=', AsteriskEqual, Asterisk),
+            '&' => self.consume_double('&', AmpersandAmpersand, Ampersand),
+            '|' => self.consume_double('|', PipePipe, Pipe),
+            '/' => self.consume_double('=', SlashEqual, Slash),
+            '!' => self.consume_double('=', ExclaimEqual, Exclaim),
+            '.' => self.consume_double('.', DotDot, Dot),
+            '<' => self.consume_double('=', LessThanEqual, LessThan),
+            '>' => self.consume_double('=', GreaterThanEqual, GreaterThan),
+            '$' => self.consume_double_with_panic('=', Destructure),
+            '=' => self.consume_double_with_panic('=', EqualEqual),
+            '0'..='9' => self.read_number_literal(start),
+            // No identifier starts with _ for good sake
+            '_' => self.consume_single(UnderScore),
+            'a'..='z' | 'A'..='Z' => self.handle_identifier(start),
+            _ => panic!("Unexpected character: '{}' at position {}", ch, start),
+        }
     }
 }
 
 impl<'l> Iterator for Lexer<'l> {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
-        let token = self.next_token();
-        if token.token_type == TokenType::Eof {
-            None
-        } else {
-            Some(token)
+        let token = self.advance_token();
+        match token.token_type {
+            TokenType::Eof => None,
+            _ => Some(token),
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::vec;
 
-// #[cfg(test)]
-// mod tests {
-//     use std::vec;
+    struct LexerTestCase<'a> {
+        name: &'a str,
+        input: &'a str,
+        expected_token: Token,
+    }
 
-//     use super::*;
+    struct LexerMultiTokenCase<'m> {
+        name: &'m str,
+        input: &'m str,
+        expected_tokens: Vec<Token>,
+    }
 
-//     struct LexerTestCase<'a> {
-//         name: &'a str,
-//         input: &'a str,
-//         expected_token: Token,
-//     }
+    fn run_test_case(case: LexerTestCase) {
+        let mut lexer = Lexer::new(case.input);
+        let token = lexer.advance_token();
+        assert_eq!(
+            token, case.expected_token,
+            "Test case {} failed: Expected {:?}, got {:?}",
+            case.name, case.expected_token, token
+        )
+    }
 
-//     struct LexerMultiTokenCase<'m> {
-//         name: &'m str,
-//         input: &'m str,
-//         expected_tokens: Vec<Token>,
-//     }
+    fn run_multiple_token_test(case: LexerMultiTokenCase) {
+        let mut lexer = Lexer::new(case.input);
+        for (i, expected) in case.expected_tokens.iter().enumerate() {
+            let token = lexer.next();
+            match token {
+                Some(t) => assert_eq!(
+                    &t, expected,
+                    "Test {} failed at token {}: expected {:?}, got {:?}",
+                    case.name, i, expected, t
+                ),
+                None => {
+                    panic!(
+                        "Test {} failed at token {}: expected {:?}, got None",
+                        case.name, i, expected
+                    );
+                }
+            }
+        }
+        let next_token = lexer.next();
+        assert!(
+            next_token.is_none(),
+            "Test {} failed: Lexer has extra tokens: {:?}",
+            case.name,
+            next_token
+        );
+    }
 
-//     fn run_test_case(case: LexerTestCase) {
-//         let mut lexer = Lexer::new(case.input);
-//         let token = lexer.next_token();
-//         assert_eq!(
-//             token, case.expected_token,
-//             "Test case {} failed: Expected {:?}, got {:?}",
-//             case.name, case.expected_token, token
-//         )
-//     }
+    #[test]
+    fn test_whitespace_and_comments() {
+        use tokens::TokenType::*;
 
-//     fn run_multiple_token_test(case: LexerMultiTokenCase) {
-//         let mut lexer = Lexer::new(case.input);
-//         for (i, expected) in case.expected_tokens.iter().enumerate() {
-//             let token = lexer.next();
-//             match token {
-//                 Some(t) => assert_eq!(&t, expected, "Test {} failed at token {}", case.name, i),
-//                 None => {
-//                     assert!(
-//                         false,
-//                         "Test {} failed at token {}: expected {:?}, got None",
-//                         case.name, i, expected
-//                     );
-//                     panic!(
-//                         "Test {} failed at token {}: expected {:?}, got None",
-//                         case.name, i, expected
-//                     );
-//                 }
-//             }
-//         }
-//         // after exhausting expected tokens, lexer should be at EOF
-//         assert!(
-//             lexer.next().is_none(),
-//             "Test {} failed: Lexer has extra tokens",
-//             case.name
-//         );
-//     }
+        let test_cases = vec![
+            LexerTestCase {
+                name: "whitespace and single-line comment",
+                input: "
 
-//     #[test]
-//     fn test_whitespace_and_comments() {
-//         use tokens::TokenType::*;
+                    # this is a comment
+                ",
+                expected_token: Token::new(0, 0, Eof),
+            },
+            LexerTestCase {
+                name: "Eof only",
+                input: " ",
+                expected_token: Token::new(0, 0, Eof),
+            },
+        ];
+        for case in test_cases {
+            run_test_case(case);
+        }
+    }
 
-//         let test_cases = vec![
-//             LexerTestCase {
-//                 name: "whitespace and single-line comment",
-//                 input: "
+    #[test]
+    fn test_single_character_token() {
+        use tokens::TokenType::*;
 
-//                     # this is a comment
-//                 ",
-//                 expected_token: Token::new(0, 0, Eof),
-//             },
-//             LexerTestCase {
-//                 name: "irregular comments",
-//                 input: "
-//                     ### #
-//                     The first rule of fight club is 
-//                     that you do not talk about fight club
-//                     # # ###
-//                 ",
-//                 expected_token: Token::new(0, 0, Eof),
-//             },
-//             LexerTestCase {
-//                 name: "Eof only",
-//                 input: " ",
-//                 expected_token: Token::new(0, 0, Eof),
-//             },
-//         ];
-//         for case in test_cases {
-//             run_test_case(case);
-//         }
-//     }
+        let test_cases = vec![
+            LexerTestCase {
+                name: "left curly brace",
+                input: "{",
+                expected_token: Token::new(0, 1, LCurly),
+            },
+            LexerTestCase {
+                name: "right curly brace",
+                input: "}",
+                expected_token: Token::new(0, 1, RCurly),
+            },
+            LexerTestCase {
+                name: "left parenthesis",
+                input: "(",
+                expected_token: Token::new(0, 1, LParen),
+            },
+        ];
 
-//     #[test]
-//     fn test_single_character_token() {
-//         use tokens::TokenType::*;
+        for case in test_cases {
+            run_test_case(case);
+        }
+    }
 
-//         let test_cases = vec![
-//             LexerTestCase {
-//                 name: "left curly brace",
-//                 input: "{",
-//                 expected_token: Token::new(0, 1, LCurly),
-//             },
-//             LexerTestCase {
-//                 name: "right curly brace",
-//                 input: "}",
-//                 expected_token: Token::new(0, 1, RCurly),
-//             },
-//             LexerTestCase {
-//                 name: "left parenthesis",
-//                 input: "(",
-//                 expected_token: Token::new(0, 1, LParen),
-//             },
-//             LexerTestCase {
-//                 name: "right parenthesis",
-//                 input: ")",
-//                 expected_token: Token::new(0, 1, RParen),
-//             },
-//             LexerTestCase {
-//                 name: "colon",
-//                 input: ":",
-//                 expected_token: Token::new(0, 1, Colon),
-//             },
-//             LexerTestCase {
-//                 name: "comma",
-//                 input: ",",
-//                 expected_token: Token::new(0, 1, Comma),
-//             },
-//             LexerTestCase {
-//                 name: "bit xor",
-//                 input: "^",
-//                 expected_token: Token::new(0, 1, BitXor),
-//             },
-//             LexerTestCase {
-//                 name: "division",
-//                 input: "/",
-//                 expected_token: Token::new(0, 1, Division),
-//             },
-//             LexerTestCase {
-//                 name: "asterisk",
-//                 input: "*",
-//                 expected_token: Token::new(0, 1, Asterisk),
-//             },
-//             LexerTestCase {
-//                 name: "minus",
-//                 input: "-",
-//                 expected_token: Token::new(0, 1, Minus),
-//             },
-//             LexerTestCase {
-//                 name: "plus",
-//                 input: "+",
-//                 expected_token: Token::new(0, 1, Plus),
-//             },
-//         ];
+    #[test]
+    fn test_multiple_character_token() {
+        use tokens::TokenType::*;
+        let test_cases = vec![
+            LexerTestCase {
+                name: "Double dot",
+                input: "..",
+                expected_token: Token::new(0, 2, DotDot),
+            },
+            LexerTestCase {
+                name: "dot token .",
+                input: ".",
+                expected_token: Token::new(0, 1, Dot),
+            },
+            LexerTestCase {
+                name: "dollar equal",
+                input: "$=",
+                expected_token: Token::new(0, 2, Destructure),
+            },
+        ];
+        for case in test_cases {
+            run_test_case(case);
+        }
+    }
 
-//         for case in test_cases {
-//             run_test_case(case);
-//         }
-//     }
+    #[test]
+    fn test_stream_of_tokens() {
+        use tokens::Literal::*;
+        use tokens::TokenType::*;
 
-//     #[test]
-//     fn test_multiple_character_token() {
-//         use tokens::TokenType::*;
-//         let test_cases = vec![
-//             LexerTestCase {
-//                 name: "range token ..",
-//                 input: "..",
-//                 expected_token: Token::new(0, 2, Range),
-//             },
-//             LexerTestCase {
-//                 name: "dot token .",
-//                 input: ".",
-//                 expected_token: Token::new(0, 1, Dot),
-//             },
-//             LexerTestCase {
-//                 name: "equal equal token ==",
-//                 input: "==",
-//                 expected_token: Token::new(0, 2, EqualEqual),
-//             },
-//             LexerTestCase {
-//                 name: "assign token =",
-//                 input: "=",
-//                 expected_token: Token::new(0, 1, Assign),
-//             },
-//             LexerTestCase {
-//                 name: "greater than equal token >=",
-//                 input: ">=",
-//                 expected_token: Token::new(0, 2, GreaterThanEqual),
-//             },
-//             LexerTestCase {
-//                 name: "greater than token >",
-//                 input: ">",
-//                 expected_token: Token::new(0, 1, GreaterThan),
-//             },
-//             LexerTestCase {
-//                 name: "less than equal token <=",
-//                 input: "<=",
-//                 expected_token: Token::new(0, 2, LessThanEqual),
-//             },
-//             LexerTestCase {
-//                 name: "less than token <",
-//                 input: "<",
-//                 expected_token: Token::new(0, 1, LessThan),
-//             },
-//             LexerTestCase {
-//                 name: "not equal token !=",
-//                 input: "!=",
-//                 expected_token: Token::new(0, 2, NotEqual),
-//             },
-//             LexerTestCase {
-//                 name: "not token !",
-//                 input: "!",
-//                 expected_token: Token::new(0, 1, Not),
-//             },
-//             LexerTestCase {
-//                 name: "or token ||",
-//                 input: "||",
-//                 expected_token: Token::new(0, 2, Or),
-//             },
-//             LexerTestCase {
-//                 name: "bit or token |",
-//                 input: "|",
-//                 expected_token: Token::new(0, 1, BitOr),
-//             },
-//             LexerTestCase {
-//                 name: "and token &&",
-//                 input: "&&",
-//                 expected_token: Token::new(0, 2, And),
-//             },
-//             LexerTestCase {
-//                 name: "bit and token &",
-//                 input: "&",
-//                 expected_token: Token::new(0, 1, BitAnd),
-//             },
-//         ];
-//         for case in test_cases {
-//             run_test_case(case);
-//         }
-//     }
-//     #[test]
-//     fn test_stream_of_tokens() {
-//         use tokens::Literal::*;
-//         use tokens::TokenType::*;
-//         let test_cases = vec![
-//             // Single keyword and identifier with punctuation
-//             LexerMultiTokenCase {
-//                 name: "Simple rune declaration",
-//                 input: "rune Account {",
-//                 expected_tokens: vec![
-//                     Token::new(0, 4, Bind),
-//                     Token::new(5, 7, Literal(Str("Account".into()))),
-//                     Token::new(13, 1, LCurly),
-//                 ],
-//             },
-//             // Struct fields with type annotations and keywords
-//             LexerMultiTokenCase {
-//                 name: "Bindings inside rune",
-//                 input: "bind owner: str\nbind balance: float",
-//                 expected_tokens: vec![
-//                     Token::new(0, 4, Bind),
-//                     Token::new(5, 5, Literal(Str("owner".into()))),
-//                     Token::new(10, 1, Colon),
-//                     Token::new(12, 3, Literal(Str("str".into()))),
-//                     Token::new(16, 4, Bind),
-//                     Token::new(21, 7, Literal(Str("balance".into()))),
-//                     Token::new(28, 1, Colon),
-//                     Token::new(30, 5, Literal(Str("float".into()))),
-//                 ],
-//             },
-//             // Function declaration and parameters
-//             LexerMultiTokenCase {
-//                 name: "Spell with parameters",
-//                 input: "spell summon(self, owner: str, balance: float) {",
-//                 expected_tokens: vec![
-//                     Token::new(0, 5, Spell),
-//                     Token::new(6, 6, Literal(Str("summon".into()))),
-//                     Token::new(12, 1, LParen),
-//                     Token::new(13, 4, SelfType),
-//                     Token::new(17, 1, Comma),
-//                     Token::new(19, 5, Literal(Str("owner".into()))),
-//                     Token::new(24, 1, Colon),
-//                     Token::new(26, 3, Literal(Str("str".into()))),
-//                     Token::new(29, 1, Comma),
-//                     Token::new(31, 7, Literal(Str("balance".into()))),
-//                     Token::new(38, 1, Colon),
-//                     Token::new(40, 5, Literal(Str("float".into()))),
-//                     Token::new(45, 1, RParen),
-//                     Token::new(47, 1, LCurly),
-//                 ],
-//             },
-//             // Conditional with reveal and veil blocks
-//             LexerMultiTokenCase {
-//                 name: "Reveal and veil blocks",
-//                 input: "reveal amount > 0 {\nchant \"Deposit successful\"\n} veil {\nchant \"Invalid deposit amount\"\n}",
-//                 expected_tokens: vec![
-//                     Token::new(0, 6, Reveal),
-//                     Token::new(7, 6, Literal(Str("amount".into()))),
-//                     Token::new(14, 1, GreaterThan),
-//                     Token::new(16, 1, Literal(Str("0".into()))), // Actually this should be Int(0), fix needed in lexer test case if required
-//                     Token::new(18, 1, LCurly),
-//                     Token::new(20, 5, Chant),
-//                     // String tokens missing in lexer, but here we treat as literal string (needs lexer support)
-//                     // For test simplicity, skipping actual string tokens (implement string lexing if needed)
-//                     // Token::new(26, ..., Literal(Str("Deposit successful".into()))),
-//                     Token::new(44, 1, RCurly),
-//                     Token::new(46, 4, Veil),
-//                     Token::new(51, 1, LCurly),
-//                     Token::new(53, 5, Chant),
-//                     // Token::new(59, ..., Literal(Str("Invalid deposit amount".into()))),
-//                     Token::new(81, 1, RCurly),
-//                 ],
-//             },
-//             // Range token and invocation loop
-//             LexerMultiTokenCase {
-//                 name: "Invoke loop and range",
-//                 input: "invoke i in 1..3 {",
-//                 expected_tokens: vec![
-//                     Token::new(0, 6, Invoke),
-//                     Token::new(7, 1, Literal(Str("i".into()))),
-//                     Token::new(9, 2, In),
-//                     Token::new(12, 1, Literal(Int(1))),
-//                     Token::new(13, 2, Range),
-//                     Token::new(15, 1, Literal(Int(3))),
-//                     Token::new(16, 1, LCurly),
-//                 ],
-//             },
-//             // Multiple sigil branches inside divine
-//             LexerMultiTokenCase {
-//                 name: "Divine with sigil cases",
-//                 input: r#"divine action {
-//                     sigil "1" { io.echoln("Enter amount to deposit:") }
-//                     sigil "2" { io.echoln("Enter amount to withdraw:") }
-//                     sigil default { io.echoln("Invalid action") }
-//                 }"#,
-//                 expected_tokens: vec![
-//                     Token::new(0, 6, Divine),
-//                     Token::new(7, 6, Literal(Str("action".into()))),
-//                     Token::new(14, 1, LCurly),
-//                     Token::new(24, 5, Sigil),
-//                     Token::new(30, 3, Literal(Str("1".into()))),
-//                     Token::new(34, 1, LCurly),
-//                     Token::new(36, 2, Literal(Str("io".into()))),
-//                     Token::new(38, 1, Dot),
-//                     Token::new(39, 7, Literal(Str("echoln".into()))),
-//                     Token::new(46, 1, LParen),
-//                     // Ignoring inner string literals for now (requires string lexing)
-//                     Token::new(68, 1, RParen),
-//                     Token::new(69, 1, RCurly),
-//                     Token::new(79, 5, Sigil),
-//                     Token::new(85, 3, Literal(Str("2".into()))),
-//                     Token::new(89, 1, LCurly),
-//                     Token::new(91, 2, Literal(Str("io".into()))),
-//                     Token::new(93, 1, Dot),
-//                     Token::new(94, 7, Literal(Str("echoln".into()))),
-//                     Token::new(101, 1, LParen),
-//                     Token::new(123, 1, RParen),
-//                     Token::new(124, 1, RCurly),
-//                     Token::new(134, 5, Sigil),
-//                     Token::new(140, 7, Default),
-//                     Token::new(148, 1, LCurly),
-//                     Token::new(150, 2, Literal(Str("io".into()))),
-//                     Token::new(152, 1, Dot),
-//                     Token::new(153, 7, Literal(Str("echoln".into()))),
-//                     Token::new(160, 1, LParen),
-//                     Token::new(176, 1, RParen),
-//                     Token::new(177, 1, RCurly),
-//                     Token::new(186, 1, RCurly),
-//                 ],
-//             },
-//         ];
-//         // Loop to run all these multi-token tests using your existing test runner
-//         for case in test_cases {
-//             run_multiple_token_test(case);
-//         }
-//     }
-// }
+        let test_cases = vec![
+            // Simple function declaration
+            LexerMultiTokenCase {
+                name: "Simple function declaration",
+                input: "@sum(int a, int b)",
+                expected_tokens: vec![
+                    Token::new(0, 1, Func),        // @
+                    Token::new(1, 3, Identifier),  // sum
+                    Token::new(4, 1, LParen),      // (
+                    Token::new(5, 3, Identifier),  // int
+                    Token::new(9, 1, Identifier),  // a
+                    Token::new(10, 1, Comma),      // ,
+                    Token::new(12, 3, Identifier), // int
+                    Token::new(16, 1, Identifier), // b
+                    Token::new(17, 1, RParen),     // )
+                ],
+            },
+            // Variable declaration with assignment
+            LexerMultiTokenCase {
+                name: "Variable declaration",
+                input: "mut int x := 42",
+                expected_tokens: vec![
+                    Token::new(0, 3, Mut),               // mut
+                    Token::new(4, 3, Identifier),        // int
+                    Token::new(8, 1, Identifier),        // x
+                    Token::new(10, 2, Assign),           // :=
+                    Token::new(13, 2, Literal(Int(42))), // 42
+                ],
+            },
+            // String literal
+            LexerMultiTokenCase {
+                name: "String literal",
+                input: "\"hello world\"",
+                expected_tokens: vec![Token::new(0, 13, Literal(Str("hello world".into())))],
+            },
+            // If-else statement
+            LexerMultiTokenCase {
+                name: "If-else statement",
+                input: "if x == 5 { return true } else { return false }",
+                expected_tokens: vec![
+                    Token::new(0, 2, If),                    // if
+                    Token::new(3, 1, Identifier),            // x
+                    Token::new(5, 2, EqualEqual),            // ==
+                    Token::new(8, 1, Literal(Int(5))),       // 5
+                    Token::new(10, 1, LCurly),               // {
+                    Token::new(12, 6, Return),               // return
+                    Token::new(19, 4, Literal(Bool(true))),  // true
+                    Token::new(24, 1, RCurly),               // }
+                    Token::new(26, 4, Else),                 // else
+                    Token::new(31, 1, LCurly),               // {
+                    Token::new(33, 6, Return),               // return
+                    Token::new(40, 5, Literal(Bool(false))), // false
+                    Token::new(46, 1, RCurly),               // }
+                ],
+            },
+            // Record definition
+            LexerMultiTokenCase {
+                name: "Record definition",
+                input: "record human { name: string, age: int }",
+                expected_tokens: vec![
+                    Token::new(0, 6, Record),      // record
+                    Token::new(7, 5, Identifier),  // human
+                    Token::new(13, 1, LCurly),     // {
+                    Token::new(15, 4, Identifier), // name
+                    Token::new(19, 1, Colon),      // :
+                    Token::new(21, 6, Identifier), // string
+                    Token::new(27, 1, Comma),      // ,
+                    Token::new(29, 3, Identifier), // age
+                    Token::new(32, 1, Colon),      // :
+                    Token::new(34, 3, Identifier), // int
+                    Token::new(38, 1, RCurly),     // }
+                ],
+            },
+            // For loop
+            LexerMultiTokenCase {
+                name: "For loop",
+                input: "for i in 1..10 { }",
+                expected_tokens: vec![
+                    Token::new(0, 3, For),               // for
+                    Token::new(4, 1, Identifier),        // i
+                    Token::new(6, 2, In),                // in
+                    Token::new(9, 1, Literal(Int(1))),   // 1
+                    Token::new(10, 2, DotDot),           // ..
+                    Token::new(12, 2, Literal(Int(10))), // 10
+                    Token::new(15, 1, LCurly),           // {
+                    Token::new(17, 1, RCurly),           // }
+                ],
+            },
+        ];
+
+        for case in test_cases {
+            run_multiple_token_test(case);
+        }
+    }
+
+    #[test]
+    fn test_operators() {
+        use tokens::TokenType::*;
+
+        let test_cases = vec![
+            LexerMultiTokenCase {
+                name: "Arithmetic operators",
+                input: "a + b - c * d / e",
+                expected_tokens: vec![
+                    Token::new(0, 1, Identifier),  // a
+                    Token::new(2, 1, Plus),        // +
+                    Token::new(4, 1, Identifier),  // b
+                    Token::new(6, 1, Minus),       // -
+                    Token::new(8, 1, Identifier),  // c
+                    Token::new(10, 1, Asterisk),   // *
+                    Token::new(12, 1, Identifier), // d
+                    Token::new(14, 1, Slash),      // /
+                    Token::new(16, 1, Identifier), // e
+                ],
+            },
+            LexerMultiTokenCase {
+                name: "Comparison operators",
+                input: "a <= b >= c != d",
+                expected_tokens: vec![
+                    Token::new(0, 1, Identifier),       // a
+                    Token::new(2, 2, LessThanEqual),    // <=
+                    Token::new(5, 1, Identifier),       // b
+                    Token::new(7, 2, GreaterThanEqual), // >=
+                    Token::new(10, 1, Identifier),      // c
+                    Token::new(12, 2, ExclaimEqual),    // !=
+                    Token::new(15, 1, Identifier),      // d
+                ],
+            },
+        ];
+
+        for case in test_cases {
+            run_multiple_token_test(case);
+        }
+    }
+
+    #[test]
+    fn test_literals() {
+        use tokens::Literal::*;
+        use tokens::TokenType::*;
+
+        let test_cases = vec![LexerMultiTokenCase {
+            name: "Various literals",
+            input: "42 3.14 \"hello\" 'c' true false",
+            expected_tokens: vec![
+                Token::new(0, 2, Literal(Int(42))),             // 42
+                Token::new(3, 4, Literal(Float(3.14))),         // 3.14
+                Token::new(8, 7, Literal(Str("hello".into()))), // "hello"
+                Token::new(16, 3, Literal(Char('c'))),          // 'c'
+                Token::new(20, 4, Literal(Bool(true))),         // true
+                Token::new(25, 5, Literal(Bool(false))),        // false
+            ],
+        }];
+
+        for case in test_cases {
+            run_multiple_token_test(case);
+        }
+    }
+}
