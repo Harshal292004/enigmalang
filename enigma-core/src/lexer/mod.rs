@@ -141,11 +141,22 @@ impl<'l> Lexer<'l> {
                 }
                 '.' => {
                     if is_float || has_exponent {
-                        valid = false;
+                        break; // For range ..
                     }
-                    is_float = true;
-                    self.advance();
-                    end = idx + 1;
+
+                    let mut temp_chars = self.chars.clone();
+                    temp_chars.next();
+                    if let Some((_, next_ch)) = temp_chars.peek() {
+                        if next_ch.is_ascii_digit() {
+                            is_float = true;
+                            self.advance();
+                            end = idx + 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
                 }
                 'e' | 'E' => {
                     if has_exponent {
@@ -584,6 +595,28 @@ mod tests {
                     Token::new(12, 2, Literal(Int(10))), // 10
                     Token::new(15, 1, LCurly),           // {
                     Token::new(17, 1, RCurly),           // }
+                ],
+            },
+            LexerMultiTokenCase {
+                name: "One line",
+                input: "@sum(int a, int b)::int -> a + b;",
+                expected_tokens: vec![
+                    Token::new(0, 1, Func),         // @
+                    Token::new(1, 3, Identifier),   // sum
+                    Token::new(4, 1, LParen),       // (
+                    Token::new(5, 3, Identifier),   // int
+                    Token::new(9, 1, Identifier),   // a
+                    Token::new(10, 1, Comma),       // ,
+                    Token::new(12, 3, Identifier),  // int
+                    Token::new(16, 1, Identifier),  // b
+                    Token::new(17, 1, RParen),      // )
+                    Token::new(18, 2, DoubleColon), // ::
+                    Token::new(20, 3, Identifier),  // int
+                    Token::new(24, 2, Arrow),       // ->
+                    Token::new(27, 1, Identifier),  // a
+                    Token::new(29, 1, Plus),        // +
+                    Token::new(31, 1, Identifier),  // b
+                    Token::new(32, 1, ReturnSemi),  // ;
                 ],
             },
         ];
