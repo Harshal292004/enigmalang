@@ -19,7 +19,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    # Github actions runs each action in its own terminal , thus the directory change doesn't persist use working-directory
     steps:
     - uses: actions/checkout@v4 # checks out your repository code so the workflow can access it
     - name: Install Rust 
@@ -27,11 +27,15 @@ jobs:
       with: 
         toolchain: stable
         override: true
-    - name: Change directory
-      run: cd enigma-core
     - name: Check formatting 
-      run: cargo fmt -- --check # checks if code is formatted properly without changing files
+      run: cargo fmt -- --check
+      working-directory: enigma-core
+
     - name: Build
-      run: cargo build --verbose # compiles the Rust project with detailed output
+      run: cargo build --verbose
+      working-directory: enigma-core
+
     - name: Run tests 
-      run: cargo test --verbose # runs the test suite with detailed output
+      run: cargo test --verbose
+      working-directory: enigma-core
+

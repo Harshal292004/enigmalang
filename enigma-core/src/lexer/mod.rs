@@ -152,7 +152,7 @@ impl<'l> Lexer<'l> {
                             self.advance();
                             end = idx + 1;
                         } else {
-                            break;
+                            break; // The next period is the range dot not the decimal 
                         }
                     } else {
                         break;
