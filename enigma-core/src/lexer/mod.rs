@@ -87,34 +87,34 @@ impl<'l> Lexer<'l> {
 
     fn read_char_literal(&mut self, start: usize) -> Token {
         self.advance(); // Consume opening quote
-        let (value, mut end) = match self.advance() {
-            Some((idx, '\\')) => {
+        let value = match self.advance() {
+            Some((_, '\\')) => {
                 if let Some((_, esc)) = self.advance() {
-                    let ch = match esc {
+                    match esc {
                         'n' => '\n',
                         't' => '\t',
                         'r' => '\r',
                         '\'' => '\'',
                         '\\' => '\\',
                         _ => esc,
-                    };
-                    (ch, idx + 1 + esc.len_utf8())
+                    }
                 } else {
                     panic!("Unterminated char literal");
                 }
             }
-            Some((idx, ch)) => (ch, idx + ch.len_utf8()),
+            Some((_, ch)) => ch,
             None => panic!("Unterminated char literal"),
         };
 
-        if let Some((idx, '\'')) = self.advance() {
-            end = idx + 1;
+        let end = if let Some((idx, '\'')) = self.advance() {
+            idx + 1
         } else {
             panic!("Expected closing quote");
-        }
+        };
 
         Token::new(start, end - start, TokenType::Literal(Literal::Char(value)))
     }
+
     fn read_identifier(&mut self, start: usize) -> &str {
         let mut end = start;
         while let Some((idx, ch)) = self.peek() {
