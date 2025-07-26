@@ -9,6 +9,7 @@ get module std.io as io
 # variables
 int x:= 4 # immutable
 mut int y:= 9 # muttable
+int k:=x+y
 
 # functions with blocks @<function_name>(<type> <call_site_name>%<implementation_name>, <type> <implementation_name>)::<return_type>{}
 # functions @<function_name>(<type> <call_site_name>%<implementation_name>,<type> <implementation_name>)::<return_type>->implementation_name 
